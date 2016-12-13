@@ -114,20 +114,22 @@ class FirstMeaningfulPaint extends Audit {
 
     // The first TracingStartedInPage in the trace is definitely our renderer thread of interest
     // Beware: the tracingStartedInPage event can appear slightly after a navigationStart
-    const tracingStartedInPage = eventsAllFrames.find(e => e.name === 'TracingStartedInPage');
+    const startedInPageEvt = eventsAllFrames.find(e => e.name === 'TracingStartedInPage');
     // Filter to just events matching the frame ID for sanity
-    const events = eventsAllFrames.filter(e => e.args.frame === tracingStartedInPage.args.data.page);
+    const events = eventsAllFrames.filter(e => e.args.frame === startedInPageEvt.args.data.page);
 
-    // Find our first FCP and work backwards from it to find the latest navStart
+    // Find our first FCP. Our navStart will be the latest one before fCP.
     const firstFCP = events.find(e => e.name === 'firstContentfulPaint');
-    const navigationStart = events.filter(e => e.name === 'navigationStart' && e.ts < firstFCP.ts).pop();
+    const navigationStart = events.filter(e =>
+        e.name === 'navigationStart' && e.ts < firstFCP.ts).pop();
     // FMP will follow at/after the FCP
-    const firstMeaningfulPaint = events.find(e => e.name === 'firstMeaningfulPaint' && e.ts >= firstFCP.ts);
+    const firstMeaningfulPaint = events.find(e =>
+        e.name === 'firstMeaningfulPaint' && e.ts >= firstFCP.ts);
 
     // navigationStart is currently essential to FMP calculation.
     // see: https://github.com/GoogleChrome/lighthouse/issues/753
     if (!navigationStart) {
-      throw new Error('No `navigationStart` event found after `TracingStartedInPage` in trace');
+      throw new Error('No `navigationStart` event found in trace');
     }
 
     return {
