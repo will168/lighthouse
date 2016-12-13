@@ -31,9 +31,14 @@ class DocWriteUse extends Gatherer {
 
   afterPass() {
     return this.collectUsage().then(DocWriteUses => {
-      this.artifact.usage = DocWriteUses;
-    }, _ => {
-      this.artifact = -1;
+      this.artifact = {
+        usage: DocWriteUses
+      };
+    }, e => {
+      this.artifact = {
+        value: -1,
+        debugString: e.message
+      };
       return;
     });
   }

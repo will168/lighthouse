@@ -27,6 +27,7 @@ class RedirectsHTTP extends Audit {
       category: 'Security',
       name: 'redirects-http',
       description: 'Site redirects HTTP traffic to HTTPS',
+      helpText: 'If you\'ve already set up HTTPS, make sure that you redirect all HTTP traffic to HTTPS. <a href="https://developers.google.com/web/tools/lighthouse/audits/http-redirects-to-https" target="_blank" rel="noreferrer noopener">Learn more</a>.',
       requiredArtifacts: ['HTTPRedirect']
     };
   }
@@ -36,13 +37,6 @@ class RedirectsHTTP extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (!artifacts.HTTPRedirect ||
-        !artifacts.HTTPRedirect.value) {
-      return RedirectsHTTP.generateAuditResult({
-        rawValue: false
-      });
-    }
-
     return RedirectsHTTP.generateAuditResult({
       rawValue: artifacts.HTTPRedirect.value,
       debugString: artifacts.HTTPRedirect.debugString

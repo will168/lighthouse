@@ -23,10 +23,13 @@ const URL = 'https://example.com';
 /* eslint-env mocha */
 
 describe('Page does not use document.write()', () => {
-  it('fails when no input present', () => {
-    const auditResult = DocWriteUseAudit.audit({});
+  it('fails when gatherer returns error', () => {
+    const debugString = 'interesting debug string';
+    const auditResult = DocWriteUseAudit.audit({
+      DocWriteUse: {value: -1, debugString}
+    });
     assert.equal(auditResult.rawValue, -1);
-    assert.ok(auditResult.debugString);
+    assert.equal(auditResult.debugString, debugString);
   });
 
   it('passes when document.write() is not used', () => {

@@ -17,6 +17,8 @@ const Formatter = require('../formatters/formatter');
 //   https://www.desmos.com/calculator/jlrx14q4w8
 const SCORING_POINT_OF_DIMINISHING_RETURNS = 1700;
 const SCORING_MEDIAN = 5000;
+// This aligns with the external TTI targets in https://goo.gl/yXqxpL
+const SCORING_TARGET = 5000;
 
 class TTIMetric extends Audit {
   /**
@@ -27,8 +29,9 @@ class TTIMetric extends Audit {
       category: 'Performance',
       name: 'time-to-interactive',
       description: 'Time To Interactive (alpha)',
-      optimalValue: SCORING_POINT_OF_DIMINISHING_RETURNS.toLocaleString(),
-      requiredArtifacts: ['traceContents']
+      helpText: 'Time to Interactive identifies the time at which your app appears to be ready enough to interact with. <a href="https://developers.google.com/web/tools/lighthouse/audits/time-to-interactive" target="_blank" rel="noopener noreferrer">Learn more</a>.',
+      optimalValue: SCORING_TARGET.toLocaleString() + 'ms',
+      requiredArtifacts: ['traces']
     };
   }
 
@@ -79,10 +82,7 @@ class TTIMetric extends Audit {
       const endOfTraceTime = model.bounds.max;
 
       // TODO: Wait for DOMContentLoadedEndEvent
-      // TODO: Wait for UA loading indicator to be done
-
-      // TODO CHECK these units are the same
-      const fMPts = timings.fMPfull + timings.navStart;
+      const fMPts = timings.fMP + timings.navStart;
 
       // look at speedline results for 85% starting at FMP
       let visuallyReadyTiming = 0;
@@ -93,7 +93,6 @@ class TTIMetric extends Audit {
         });
 
         if (eightyFivePctVC) {
-          // TODO CHECK these units are the same
           visuallyReadyTiming = eightyFivePctVC.getTimeStamp() - timings.navStart;
         }
       }
@@ -104,7 +103,7 @@ class TTIMetric extends Audit {
       let currentLatency = Infinity;
       const percentiles = [0.9]; // [0.75, 0.9, 0.99, 1];
       const threshold = 50;
-      let foundLatencies = [];
+      const foundLatencies = [];
 
       // When we've found a latency that's good enough, we're good.
       while (currentLatency > threshold) {

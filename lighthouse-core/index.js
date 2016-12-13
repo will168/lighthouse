@@ -25,7 +25,7 @@ if (!environment.checkNodeCompatibility()) {
 
 const Runner = require('./runner');
 const log = require('./lib/log.js');
-const ChromeProtocol = require('./gather/drivers/cri.js');
+const ChromeProtocol = require('./gather/connections/cri.js');
 const Config = require('./config/config');
 
 /**
@@ -58,14 +58,14 @@ module.exports = function(url, flags, configJSON) {
     // Use ConfigParser to generate a valid config file
     const config = new Config(configJSON, flags.configPath);
 
-    const driver = new ChromeProtocol();
+    const connection = new ChromeProtocol(flags.port);
 
     // kick off a lighthouse run
-    resolve(Runner.run(driver, {url, flags, config}));
+    resolve(Runner.run(connection, {url, flags, config}));
   });
 };
 
 module.exports.getAuditList = Runner.getAuditList;
-module.exports.traceCategories = require('./gather/drivers/driver').traceCategories;
+module.exports.traceCategories = require('./gather/driver').traceCategories;
 module.exports.Audit = require('./audits/audit');
 module.exports.Gatherer = require('./gather/gatherers/gatherer');

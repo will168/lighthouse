@@ -46,14 +46,6 @@ class UsesHTTP2Audit extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (typeof artifacts.networkRecords === 'undefined' ||
-        artifacts.URL === 'undefined') {
-      return UsesHTTP2Audit.generateAuditResult({
-        rawValue: -1,
-        debugString: 'Network or URL gatherer did not run'
-      });
-    }
-
     const networkRecords = artifacts.networkRecords[Audit.DEFAULT_PASS];
     const finalHost = url.parse(artifacts.URL.finalUrl).host;
 
@@ -63,10 +55,19 @@ class UsesHTTP2Audit extends Audit {
       const sameHost = requestHost === finalHost;
       const notH2 = /HTTP\/[01][\.\d]?/i.test(record.protocol);
       return sameHost && notH2;
+    }).map(record => {
+      return {
+        label: record.protocol,
+        url: record.url // .url is a getter and not copied over for the assign.
+      };
     });
 
-    const displayValue = (resources.length ?
-        `${resources.length} resources were not served over h2` : '');
+    let displayValue = '';
+    if (resources.length > 1) {
+      displayValue = `${resources.length} resources were not served over h2`;
+    } else if (resources.length === 1) {
+      displayValue = `${resources.length} resource was not served over h2`;
+    }
 
     return UsesHTTP2Audit.generateAuditResult({
       rawValue: resources.length === 0,

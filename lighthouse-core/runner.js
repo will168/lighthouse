@@ -16,8 +16,10 @@
  */
 'use strict';
 
+const Driver = require('./gather/driver.js');
 const GatherRunner = require('./gather/gather-runner');
 const Aggregate = require('./aggregator/aggregate');
+const Audit = require('./audits/audit');
 const assetSaver = require('./lib/asset-saver');
 const log = require('./lib/log');
 const fs = require('fs');
@@ -25,16 +27,10 @@ const path = require('path');
 const url = require('url');
 
 class Runner {
-  static run(driver, opts) {
+  static run(connection, opts) {
     // Clean opts input.
     opts.flags = opts.flags || {};
     let artifactsForLater;
-
-    // Default mobile emulation and page loading to true.
-    // The extension will switch these off initially.
-    if (typeof opts.flags.mobile === 'undefined') {
-      opts.flags.mobile = true;
-    }
 
     const config = opts.config;
 
@@ -70,7 +66,7 @@ class Runner {
     // to check that there are artifacts specified in the config, and throw if not.
     if (validPassesAndAudits || validArtifactsAndAudits) {
       if (validPassesAndAudits) {
-        opts.driver = driver;
+        opts.driver = opts.driverMock || new Driver(connection);
         // Finally set up the driver to gather.
         run = run.then(_ => GatherRunner.run(config.passes, opts));
       } else if (validArtifactsAndAudits) {
@@ -78,6 +74,18 @@ class Runner {
           return Object.assign(GatherRunner.instantiateComputedArtifacts(), config.artifacts);
         });
       }
+
+      // Basic check that the traces (gathered or loaded) are valid.
+      run = run.then(artifacts => {
+        for (const passName of Object.keys(artifacts.traces || {})) {
+          const trace = artifacts.traces[passName];
+          if (!Array.isArray(trace.traceEvents)) {
+            throw new Error(passName + ' trace was invalid. `traceEvents` was not an array.');
+          }
+        }
+
+        return artifacts;
+      });
 
       // Ignoring these two flags for coverage as this functionality is not exposed by the module.
       /* istanbul ignore next */
@@ -88,25 +96,20 @@ class Runner {
         });
       }
 
-      // Now run the audits.
-      let auditResults = [];
+      // Run each audit sequentially, the auditResults array has all our fine work
+      const auditResults = [];
       run = run.then(artifacts => config.audits.reduce((chain, audit) => {
-        const status = `Evaluating: ${audit.meta.description}`;
-        // Run each audit sequentially, the auditResults array has all our fine work
         return chain.then(_ => {
-          log.log('status', status);
-          return audit.audit(artifacts);
-        }).then(ret => {
-          log.verbose('statusEnd', status);
-          auditResults.push(ret);
-        });
+          return Runner._runAudit(audit, artifacts);
+        }).then(ret => auditResults.push(ret));
       }, Promise.resolve()).then(_ => auditResults));
     } else if (config.auditResults) {
       // If there are existing audit results, surface those here.
       run = run.then(_ => config.auditResults);
     } else {
-      throw new Error(
+      const err = Error(
           'The config must provide passes and audits, artifacts and audits, or auditResults');
+      return Promise.reject(err);
     }
 
     /* istanbul ignore next */
@@ -134,6 +137,8 @@ class Runner {
         }
 
         return {
+          lighthouseVersion: require('../package').version,
+          generatedTime: (new Date()).toJSON(),
           initialUrl: opts.initialUrl,
           url: opts.url,
           audits: formattedAudits,
@@ -145,13 +150,54 @@ class Runner {
   }
 
   /**
+   * Checks that the audit's required artifacts exist and runs the audit if so.
+   * Otherwise returns error audit result.
+   * @param {!Audit} audit
+   * @param {!Artifacts} artifacts
+   * @return {!Promise<!AuditResult>}
+   * @private
+   */
+  static _runAudit(audit, artifacts) {
+    const status = `Evaluating: ${audit.meta.description}`;
+
+    return Promise.resolve().then(_ => {
+      log.log('status', status);
+
+      // Return an early error if an artifact required for the audit is missing.
+      for (const artifactName of audit.meta.requiredArtifacts) {
+        const noArtifact = typeof artifacts[artifactName] === 'undefined';
+
+        // If trace required, check that DEFAULT_PASS trace exists.
+        // TODO: need pass-specific check of networkRecords and traces.
+        const noTrace = artifactName === 'traces' && !artifacts.traces[Audit.DEFAULT_PASS];
+
+        if (noArtifact || noTrace) {
+          log.warn('Runner',
+              `${artifactName} gatherer, required by audit ${audit.meta.name}, did not run.`);
+          return audit.generateAuditResult({
+            rawValue: -1,
+            debugString: `Required ${artifactName} gatherer did not run.`
+          });
+        }
+      }
+
+      return audit.audit(artifacts);
+    }).then(result => {
+      log.verbose('statusEnd', status);
+      return result;
+    });
+  }
+
+  /**
    * Returns list of audit names for external querying.
    * @return {!Array<string>}
    */
   static getAuditList() {
-    return fs
-        .readdirSync(path.join(__dirname, './audits'))
-        .filter(f => /\.js$/.test(f));
+    const fileList = [
+      ...fs.readdirSync(path.join(__dirname, './audits')),
+      ...fs.readdirSync(path.join(__dirname, './audits/dobetterweb')).map(f => `dobetterweb/${f}`)
+    ];
+    return fileList.filter(f => /\.js$/.test(f) && f !== 'audit.js').sort();
   }
 
   /**
@@ -159,9 +205,12 @@ class Runner {
    * @return {!Array<string>}
    */
   static getGathererList() {
-    return fs
-        .readdirSync(path.join(__dirname, './gather/gatherers'))
-        .filter(f => /\.js$/.test(f));
+    const fileList = [
+      ...fs.readdirSync(path.join(__dirname, './gather/gatherers')),
+      ...fs.readdirSync(path.join(__dirname, './gather/gatherers/dobetterweb'))
+          .map(f => `dobetterweb/${f}`)
+    ];
+    return fileList.filter(f => /\.js$/.test(f) && f !== 'gatherer.js').sort();
   }
 
   /**

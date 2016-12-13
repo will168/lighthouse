@@ -19,25 +19,49 @@ const ReportGenerator = require('../../report/report-generator.js');
 const sampleResults = require('../results/sample.json');
 const assert = require('assert');
 
-/* global describe, it*/
+/* eslint-env mocha */
 
-/*
-Most of the functionality is tested via the Printer class, but in this
-particular case, we need to test the functionality that would be branched for the
-extension, which is relatively minor stuff.
-*/
+// Most of the functionality is tested via the Printer class, but in this
+// particular case, we need to test the functionality that would be branched for
+// the extension, which is relatively minor stuff.
 describe('Report', () => {
   it('generates CLI HTML', () => {
     const reportGenerator = new ReportGenerator();
-    const html = reportGenerator.generateHTML(sampleResults, {inline: true});
-
-    return assert.ok(/<script>/gim.test(html));
+    const html = reportGenerator.generateHTML(sampleResults);
+    assert.ok(/<script>/gim.test(html));
   });
 
-  it('generates extension HTML', () => {
+  it('should format generated Time', () => {
     const reportGenerator = new ReportGenerator();
-    const html = reportGenerator.generateHTML(sampleResults, {inline: false});
+    const html = reportGenerator.generateHTML(sampleResults);
+    assert.ok(/on 11\/\d{1,2}\/2016\, /gim.test(html));
+  });
 
-    return assert.ok(/<script src/gim.test(html));
+  it('should escape closing </script> tags', () => {
+    const reportGenerator = new ReportGenerator();
+    const html = reportGenerator.generateHTML(sampleResults);
+    assert.ok(/<\/script>/gim.test(html));
+  });
+
+  it('sets report context in HTML', () => {
+    const reportGenerator = new ReportGenerator();
+    let html = reportGenerator.generateHTML(sampleResults);
+    assert.ok(html.includes('data-report-context="extension"'),
+              'default report context is "extension"');
+    html = reportGenerator.generateHTML(sampleResults, 'viewer');
+    assert.ok(html.includes('<html data-report-context="viewer"'), 'viewer report context');
+  });
+
+  it('generates HTML', () => {
+    const reportGenerator = new ReportGenerator();
+    const html = reportGenerator.generateHTML(sampleResults);
+
+    assert.ok(html.includes('self.lhresults = {'), 'results object was not added');
+    assert.ok(html.includes('<footer'), 'no footer tag found');
+    assert.ok(html.includes('printButton = document.querySelector'),
+              'lighthouse-report.js was not inlined');
+    assert.ok(html.includes('.report-body {'), 'report.css was not inlined');
+    assert.ok(!html.includes('&quot;lighthouseVersion'), 'lhresults were not escaped');
+    assert.ok(/Version: x\.x\.x/g.test(html), 'Version doesn\'t appear in report');
   });
 });

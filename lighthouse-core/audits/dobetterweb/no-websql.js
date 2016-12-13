@@ -33,7 +33,7 @@ class NoWebSQLAudit extends Audit {
     return {
       category: 'Offline',
       name: 'no-websql',
-      description: 'Site is not using WebSQL DB.',
+      description: 'Site does not use WebSQL DB.',
       helpText: 'Web SQL Database is <a href="https://dev.w3.org/html5/webdatabase/" target="_blank">deprecated</a>. Consider implementing an offline solution using <a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB" target="_blank">IndexedDB</a>.',
       requiredArtifacts: ['WebSQL']
     };
@@ -44,12 +44,10 @@ class NoWebSQLAudit extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (typeof artifacts.WebSQL === 'undefined' ||
-        artifacts.WebSQL.database === -1) {
+    if (artifacts.WebSQL.database === -1) {
       return NoWebSQLAudit.generateAuditResult({
         rawValue: -1,
-        debugString: (artifacts.WebSQL ?
-            artifacts.WebSQL.debugString : 'WebSQL gatherer did not run')
+        debugString: artifacts.WebSQL.debugString
       });
     }
 

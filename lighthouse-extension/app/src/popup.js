@@ -16,8 +16,6 @@
  */
 'use strict';
 
-const _flatten = arr => [].concat.apply([], arr);
-
 document.addEventListener('DOMContentLoaded', _ => {
   const background = chrome.extension.getBackgroundPage();
   const defaultAggregations = background.getDefaultAggregations();
@@ -36,6 +34,53 @@ document.addEventListener('DOMContentLoaded', _ => {
   const optionsEl = document.body.querySelector('.options');
   const optionsList = document.body.querySelector('.options__list');
   const okButton = document.getElementById('ok');
+
+  const MAX_ISSUE_ERROR_LENGTH = 60;
+
+  /**
+   * Error strings that indicate a problem in how Lighthouse was run, not in
+   * Lighthouse itself, mapped to more useful strings to report to the user.
+   */
+  const NON_BUG_ERROR_MESSAGES = {
+    'Another debugger': 'You probably have DevTools open. Close DevTools to use Lighthouse',
+    'multiple tabs': 'You probably have multiple tabs open to the same origin. ' +
+        'Close the other tabs to use Lighthouse.',
+    // The extension debugger API is forbidden from attaching to the web store.
+    // @see https://chromium.googlesource.com/chromium/src/+/5d1f214db0f7996f3c17cd87093d439ce4c7f8f1/chrome/common/extensions/chrome_extensions_client.cc#232
+    'The extensions gallery cannot be scripted': 'The Lighthouse extension cannot audit the ' +
+        'Chrome Web Store. If necessary, use the Lighthouse CLI to do so.'
+  };
+
+  function getLighthouseVersion() {
+    return chrome.runtime.getManifest().version;
+  }
+
+  function getChromeVersion() {
+    return /Chrome\/([0-9.]+)/.exec(navigator.userAgent)[1];
+  }
+
+  function buildReportErrorLink(err) {
+    const reportErrorEl = document.createElement('a');
+    reportErrorEl.className = 'button button--report-error';
+
+    let qsBody = '**Lighthouse Version**: ' + getLighthouseVersion() + '\n';
+    qsBody += '**Chrome Version**: ' + getChromeVersion() + '\n';
+    qsBody += '**Error Message**: ' + err.message + '\n';
+    qsBody += '**Stack Trace**:\n ```' + err.stack + '```';
+
+    const base = 'https://github.com/googlechrome/lighthouse/issues/new?';
+    let titleError = err.message;
+    if (titleError.length > MAX_ISSUE_ERROR_LENGTH) {
+      titleError = `${titleError.substring(0, MAX_ISSUE_ERROR_LENGTH - 3)}...`;
+    }
+    const title = encodeURI('title=Extension Error: ' + titleError);
+    const body = '&body=' + encodeURI(qsBody);
+
+    reportErrorEl.href = base + title + body;
+    reportErrorEl.textContent = 'Report Error';
+    reportErrorEl.target = '_blank';
+    return reportErrorEl;
+  }
 
   let spinnerAnimation;
 
@@ -94,22 +139,6 @@ document.addEventListener('DOMContentLoaded', _ => {
     return frag;
   }
 
-  /**
-   * Returns an array of names of audits from the selected aggregation
-   * categories.
-   * @param {!Object<boolean>} selectedAggregations
-   * @return {!Array<string>}
-   */
-  function getAuditsFromSelected(selectedAggregations) {
-    const auditLists = defaultAggregations.filter(aggregation => {
-      return selectedAggregations[aggregation.name];
-    }).map(selectedAggregation => {
-      return selectedAggregation.audits;
-    });
-
-    return _flatten(auditLists);
-  }
-
   background.listenForStatus(logstatus);
   background.loadSelectedAggregations().then(aggregations => {
     const frag = generateOptionsList(optionsList, aggregations);
@@ -121,24 +150,35 @@ document.addEventListener('DOMContentLoaded', _ => {
     feedbackEl.textContent = '';
 
     background.loadSelectedAggregations()
-    .then(getAuditsFromSelected)
-    .then(selectedAudits => {
-      return background.runLighthouse({
+    .then(selectedAggregations => {
+      return background.runLighthouseInExtension({
         flags: {
-          mobile: true
-        }
-      }, selectedAudits);
-    })
-    .then(results => {
-      background.createPageAndPopulate(results);
+          disableCpuThrottling: true
+        },
+        restoreCleanState: true
+      }, selectedAggregations);
     })
     .catch(err => {
-      let {message} = err;
-      if (err.message.toLowerCase().startsWith('another debugger')) {
-        message = 'You probably have DevTools open.' +
-          ' Close DevTools to use lighthouse';
+      let message = err.message;
+      let includeReportLink = true;
+
+      // Check for errors in how the user ran Lighthouse and replace with a more
+      // helpful message (and remove 'Report Error' link).
+      for (const [test, replacement] of Object.entries(NON_BUG_ERROR_MESSAGES)) {
+        if (message.includes(test)) {
+          message = replacement;
+          includeReportLink = false;
+          break;
+        }
       }
+
       feedbackEl.textContent = message;
+
+      if (includeReportLink) {
+        feedbackEl.className = 'feedback-error';
+        feedbackEl.appendChild(buildReportErrorLink(err));
+      }
+
       stopSpinner();
       background.console.error(err);
     });

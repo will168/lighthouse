@@ -36,7 +36,7 @@ class NoDateNowAudit extends Audit {
       category: 'JavaScript',
       name: 'no-datenow',
       description: 'Site does not use Date.now() in its own scripts',
-      helpText: 'Consider using <a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/now" target="_blank">performance.now()</a>, which as better precision than <code>Date.now()</code> and always increases at a constant rate, independent of the system clock.',
+      helpText: 'Consider using <a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/now" target="_blank">performance.now()</a>, which has better precision than <code>Date.now()</code> and always increases at a constant rate, independent of the system clock.',
       requiredArtifacts: ['URL', 'DateNowUse']
     };
   }
@@ -46,21 +46,26 @@ class NoDateNowAudit extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (typeof artifacts.DateNowUse === 'undefined' ||
-        artifacts.DateNowUse === -1) {
+    if (artifacts.DateNowUse.value === -1) {
+      let debugString = 'Unknown error with the DateNowUse gatherer';
+      if (artifacts.DateNowUse.debugString) {
+        debugString = artifacts.DateNowUse.debugString;
+      }
+
       return NoDateNowAudit.generateAuditResult({
         rawValue: -1,
-        debugString: 'DateNowUse gatherer did not run'
+        debugString
       });
     }
 
     const pageHost = url.parse(artifacts.URL.finalUrl).host;
-    // Filter usage from other hosts.
+    // Filter usage from other hosts and keep eval'd code.
     const results = artifacts.DateNowUse.usage.filter(err => {
-      return url.parse(err.url).host === pageHost;
+      return err.isEval ? err.url : url.parse(err.url).host === pageHost;
     }).map(err => {
       return Object.assign({
-        misc: `(line: ${err.line}, col: ${err.col})`
+        label: `line: ${err.line}, col: ${err.col}`,
+        url: err.url
       }, err);
     });
 

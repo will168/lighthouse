@@ -19,40 +19,9 @@
 
 'use strict';
 
-/* Using ES5 to broaden support */
-function LighthouseReport() {
-  this.printButton = document.querySelector('.js-print');
-  this.checkboxToggleView = document.querySelector('.js-toggle-view');
-  this.viewUserFeature = document.querySelector('.js-report-by-user-feature');
-  this.viewTechnology = document.querySelector('.js-report-by-technology');
-
-  this.updateView = this.updateView.bind(this);
-
-  this.addEventListeners();
-}
-
-LighthouseReport.prototype = {
-
-  onPrint: function() {
+window.addEventListener('DOMContentLoaded', _ => {
+  const printButton = document.querySelector('.js-print');
+  printButton.addEventListener('click', _ => {
     window.print();
-  },
-
-  updateView: function() {
-    if (this.checkboxToggleView.checked) {
-      this.viewUserFeature.setAttribute('hidden', 'hidden');
-      this.viewTechnology.removeAttribute('hidden');
-    } else {
-      this.viewUserFeature.removeAttribute('hidden');
-      this.viewTechnology.setAttribute('hidden', 'hidden');
-    }
-  },
-
-  addEventListeners: function() {
-    this.printButton.addEventListener('click', this.onPrint);
-    this.checkboxToggleView.addEventListener('change', this.updateView);
-  }
-};
-
-(function() {
-  return new LighthouseReport();
-})();
+  });
+});

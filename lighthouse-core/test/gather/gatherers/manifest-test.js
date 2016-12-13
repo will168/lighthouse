@@ -24,10 +24,6 @@ let manifestGather;
 const EXAMPLE_MANIFEST_URL = 'https://example.com/manifest.json';
 const EXAMPLE_DOC_URL = 'https://example.com/index.html';
 
-const isExpectedOutput = artifact => {
-  return 'raw' in artifact && 'value' in artifact;
-};
-
 describe('Manifest gatherer', () => {
   // Reset the Gatherer before each test.
   beforeEach(() => {
@@ -51,32 +47,32 @@ describe('Manifest gatherer', () => {
     });
   });
 
-  it('handles driver failure', () => {
-    return manifestGather.afterPass({
-      driver: {
-        sendCommand() {
-          return Promise.reject('such a fail');
-        }
-      }
-    }).then(_ => {
-      assert(false);
-    }).catch(_ => {
-      assert.ok(isExpectedOutput(manifestGather.artifact));
-    });
-  });
-
-  it('propagates error retrieving the manifest', () => {
+  it('propagates error from driver failure', () => {
     const error = 'There was an error.';
     return manifestGather.afterPass({
       driver: {
         sendCommand() {
+          return Promise.reject(error);
+        }
+      }
+    }).then(_ => {
+      assert.ok(manifestGather.artifact.debugString);
+      assert.notStrictEqual(manifestGather.artifact.debugString.indexOf(error), -1);
+    });
+  });
+
+  it('emits an error when unable to retrieve the manifest', () => {
+    return manifestGather.afterPass({
+      driver: {
+        sendCommand() {
           return Promise.resolve({
-            errors: [error]
+            errors: [],
+            url: EXAMPLE_MANIFEST_URL
           });
         }
       }
     }).then(_ => {
-      assert.notStrictEqual(manifestGather.artifact.debugString.indexOf(error), -1);
+      assert.ok(manifestGather.artifact.debugString);
     });
   });
 

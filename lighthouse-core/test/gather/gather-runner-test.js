@@ -30,11 +30,8 @@ class TestGatherer extends Gatherer {
     this.called = false;
   }
 
-  get name() {
-    return 'test';
-  }
-
   pass() {
+    this.artifact = 'MyArtifact';
     this.called = true;
   }
 }
@@ -46,6 +43,42 @@ class TestGathererNoArtifact {
 }
 
 const fakeDriver = require('./fake-driver');
+
+function getMockedEmulationDriver(emulationFn, netThrottleFn, cpuThrottleFn) {
+  const Driver = require('../../gather/driver');
+  const Connection = require('../../gather/connections/connection');
+  const EmulationDriver = class extends Driver {
+    enableRuntimeEvents() {
+      return Promise.resolve();
+    }
+    assertNoSameOriginServiceWorkerClients() {
+      return Promise.resolve();
+    }
+    cleanAndDisableBrowserCaches() {}
+    clearDataForOrigin() {}
+  };
+  const EmulationMock = class extends Connection {
+    sendCommand(command) {
+      let fn = null;
+      switch (command) {
+        case 'Network.emulateNetworkConditions':
+          fn = netThrottleFn;
+          break;
+        case 'Emulation.setCPUThrottlingRate':
+          fn = cpuThrottleFn;
+          break;
+        case 'Emulation.setDeviceMetricsOverride':
+          fn = emulationFn;
+          break;
+        default:
+          fn = null;
+          break;
+      }
+      return Promise.resolve(fn && fn());
+    }
+  };
+  return new EmulationDriver(new EmulationMock());
+}
 
 describe('GatherRunner', function() {
   it('loads a page', () => {
@@ -77,39 +110,113 @@ describe('GatherRunner', function() {
     });
   });
 
-  it('sets up the driver to begin emulation when mobile == true', () => {
-    let calledEmulation = false;
-    const driver = {
-      beginEmulation() {
-        calledEmulation = true;
-      },
-      cleanAndDisableBrowserCaches() {},
-      clearDataForOrigin() {}
+  it('sets up the driver to begin emulation when all emulation flags are undefined', () => {
+    const tests = {
+      calledDeviceEmulation: false,
+      calledNetworkEmulation: false,
+      calledCpuEmulation: false,
     };
+    const createEmulationCheck = variable => () => {
+      tests[variable] = true;
 
-    return GatherRunner.setupDriver(driver, {
-      flags: {
-        mobile: true
-      }
-    }).then(_ => {
-      assert.equal(calledEmulation, true);
-    });
-  });
-
-  it('does not set up the driver to begin emulation when mobile == false', () => {
-    let calledEmulation = false;
-    const driver = {
-      beginEmulation() {
-        calledEmulation = true;
-      },
-      cleanAndDisableBrowserCaches() {},
-      clearDataForOrigin() {}
+      return true;
     };
+    const driver = getMockedEmulationDriver(
+      createEmulationCheck('calledDeviceEmulation'),
+      createEmulationCheck('calledNetworkEmulation'),
+      createEmulationCheck('calledCpuEmulation')
+    );
 
     return GatherRunner.setupDriver(driver, {
       flags: {}
     }).then(_ => {
-      assert.equal(calledEmulation, false);
+      assert.equal(tests.calledDeviceEmulation, true);
+      assert.equal(tests.calledNetworkEmulation, true);
+      assert.equal(tests.calledCpuEmulation, true);
+    });
+  });
+
+  it(`sets up the driver to stop device emulation when
+  disableDeviceEmulation flag is true`, () => {
+    const tests = {
+      calledDeviceEmulation: false,
+      calledNetworkEmulation: false,
+      calledCpuEmulation: false,
+    };
+    const createEmulationCheck = variable => () => {
+      tests[variable] = true;
+      return true;
+    };
+    const driver = getMockedEmulationDriver(
+      createEmulationCheck('calledDeviceEmulation', false),
+      createEmulationCheck('calledNetworkEmulation', true),
+      createEmulationCheck('calledCpuEmulation', true)
+    );
+
+    return GatherRunner.setupDriver(driver, {
+      flags: {
+        disableDeviceEmulation: true,
+      }
+    }).then(_ => {
+      assert.equal(tests.calledDeviceEmulation, false);
+      assert.equal(tests.calledNetworkEmulation, true);
+      assert.equal(tests.calledCpuEmulation, true);
+    });
+  });
+
+  it(`sets up the driver to stop network throttling when
+  disableNetworkThrottling flag is true`, () => {
+    const tests = {
+      calledDeviceEmulation: false,
+      calledNetworkEmulation: false,
+      calledCpuEmulation: false,
+    };
+    const createEmulationCheck = variable => () => {
+      tests[variable] = true;
+      return true;
+    };
+    const driver = getMockedEmulationDriver(
+      createEmulationCheck('calledDeviceEmulation'),
+      createEmulationCheck('calledNetworkEmulation'),
+      createEmulationCheck('calledCpuEmulation')
+    );
+
+    return GatherRunner.setupDriver(driver, {
+      flags: {
+        disableNetworkThrottling: true,
+      }
+    }).then(_ => {
+      assert.equal(tests.calledDeviceEmulation, true);
+      assert.equal(tests.calledNetworkEmulation, false);
+      assert.equal(tests.calledCpuEmulation, true);
+    });
+  });
+
+  it(`sets up the driver to stop cpu throttling when
+  disableCpuThrottling flag is true`, () => {
+    const tests = {
+      calledDeviceEmulation: false,
+      calledNetworkEmulation: false,
+      calledCpuEmulation: false,
+    };
+    const createEmulationCheck = variable => () => {
+      tests[variable] = true;
+      return true;
+    };
+    const driver = getMockedEmulationDriver(
+      createEmulationCheck('calledDeviceEmulation'),
+      createEmulationCheck('calledNetworkEmulation'),
+      createEmulationCheck('calledCpuEmulation')
+    );
+
+    return GatherRunner.setupDriver(driver, {
+      flags: {
+        disableCpuThrottling: true,
+      }
+    }).then(_ => {
+      assert.equal(tests.calledDeviceEmulation, true);
+      assert.equal(tests.calledNetworkEmulation, true);
+      assert.equal(tests.calledCpuEmulation, false);
     });
   });
 
@@ -129,7 +236,7 @@ describe('GatherRunner', function() {
     };
 
     const config = {
-      trace: true,
+      recordTrace: true,
       gatherers: [{}]
     };
 
@@ -152,7 +259,7 @@ describe('GatherRunner', function() {
     };
 
     const config = {
-      trace: true,
+      recordTrace: true,
       gatherers: [{
         afterPass() {}
       }]
@@ -177,7 +284,7 @@ describe('GatherRunner', function() {
     };
 
     const config = {
-      network: true,
+      recordNetwork: true,
       gatherers: [{}]
     };
 
@@ -196,7 +303,7 @@ describe('GatherRunner', function() {
     };
 
     const config = {
-      network: true,
+      recordNetwork: true,
       gatherers: [{
         afterPass() {}
       }]
@@ -230,15 +337,13 @@ describe('GatherRunner', function() {
     const flags = {};
 
     const passes = [{
-      network: true,
-      trace: true,
+      recordNetwork: true,
+      recordTrace: true,
       passName: 'firstPass',
-      loadPage: true,
       gatherers: [
         t1
       ]
     }, {
-      loadPage: true,
       passName: 'secondPass',
       gatherers: [
         t2
@@ -253,23 +358,19 @@ describe('GatherRunner', function() {
     }).then(_ => {
       assert.ok(t1.called);
       assert.ok(t2.called);
-    }, _ => {
-      assert.ok(false);
     });
   });
 
   it('respects trace names', () => {
     const passes = [{
-      network: true,
-      trace: true,
+      recordNetwork: true,
+      recordTrace: true,
       passName: 'firstPass',
-      loadPage: true,
       gatherers: [new TestGatherer()]
     }, {
-      network: true,
-      trace: true,
+      recordNetwork: true,
+      recordTrace: true,
       passName: 'secondPass',
-      loadPage: true,
       gatherers: [new TestGatherer()]
     }];
     const options = {driver: fakeDriver, url: 'https://example.com', flags: {}, config: {}};
@@ -289,10 +390,9 @@ describe('GatherRunner', function() {
     const flags = {};
 
     const passes = [{
-      network: true,
-      trace: true,
+      recordNetwork: true,
+      recordTrace: true,
       passName: 'firstPass',
-      loadPage: true,
       gatherers: [
         t1
       ]
@@ -313,6 +413,10 @@ describe('GatherRunner', function() {
     return assert.doesNotThrow(_ => GatherRunner.getGathererClass('valid-custom-gatherer', root));
   });
 
+  it('returns gatherer when gatherer class, not package-name string, is provided', () => {
+    assert.equal(GatherRunner.getGathererClass(TestGatherer, '.'), TestGatherer);
+  });
+
   it('throws when a gatherer is not found', () => {
     return assert.throws(_ => GatherRunner.getGathererClass(
         '/fake-path/non-existent-gatherer'), /locate gatherer/);
@@ -328,7 +432,7 @@ describe('GatherRunner', function() {
   it('loads a gatherer from node_modules/', () => {
     return assert.throws(_ => GatherRunner.getGathererClass(
         // Use a lighthouse dep as a stand in for a module.
-        'chrome-remote-interface'
+        'mocha'
     ), function(err) {
       // Should throw a gatherer validation error, but *not* a gatherer not found error.
       return !/locate gatherer/.test(err) && /beforePass\(\) method/.test(err);
@@ -367,9 +471,6 @@ describe('GatherRunner', function() {
 
     assert.throws(_ => GatherRunner.getGathererClass('missing-after-pass', root),
       /afterPass\(\) method/);
-
-    return assert.throws(_ => GatherRunner.getGathererClass('missing-artifact', root),
-      /artifact property/);
   });
 
   it('can create computed artifacts', () => {
@@ -382,10 +483,9 @@ describe('GatherRunner', function() {
 
   it('will instantiate computed artifacts during a run', () => {
     const passes = [{
-      network: true,
-      trace: true,
+      recordNetwork: true,
+      recordTrace: true,
       passName: 'firstPass',
-      loadPage: true,
       gatherers: [new TestGatherer()]
     }];
     const options = {driver: fakeDriver, url: 'https://example.com', flags: {}, config: {}};

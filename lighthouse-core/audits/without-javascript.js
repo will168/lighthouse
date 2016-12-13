@@ -28,6 +28,7 @@ class WithoutJavaScript extends Audit {
       category: 'JavaScript',
       name: 'without-javascript',
       description: 'Page contains some content when its scripts are not available',
+      helpText: 'Your app should display some content when JavaScript is disabled, even if it\'s just a warning to the user that JavaScript is required to use the app. <a href="https://developers.google.com/web/tools/lighthouse/audits/no-js" target="_blank" rel="noreferrer noopener">Learn more</a>.',
       requiredArtifacts: ['HTMLWithoutJavaScript']
     };
   }
@@ -37,16 +38,24 @@ class WithoutJavaScript extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    let bodyHasContent = true;
-    let debugString;
-    if (artifacts.HTMLWithoutJavaScript.trim() === '') {
-      bodyHasContent = false;
-      debugString = 'The page body should render some content if its scripts are not available.';
+    const artifact = artifacts.HTMLWithoutJavaScript;
+    if (typeof artifact.value !== 'string') {
+      return WithoutJavaScript.generateAuditResult({
+        rawValue: -1,
+        debugString: artifact.debugString ||
+            'HTMLWithoutJavaScript gatherer did not complete successfully'
+      });
+    }
+
+    if (artifact.value.trim() === '') {
+      return WithoutJavaScript.generateAuditResult({
+        rawValue: false,
+        debugString: 'The page body should render some content if its scripts are not available.'
+      });
     }
 
     return WithoutJavaScript.generateAuditResult({
-      rawValue: bodyHasContent,
-      debugString
+      rawValue: true
     });
   }
 }

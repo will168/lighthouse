@@ -26,16 +26,23 @@ module.exports = {
   gotoURL() {
     return Promise.resolve();
   },
-
   beginEmulation() {
     return Promise.resolve();
   },
-
-  cleanAndDisableBrowserCaches() {},
-  clearDataForOrigin() {},
+  assertNoSameOriginServiceWorkerClients() {
+    return Promise.resolve();
+  },
   reloadForCleanStateIfNeeded() {
     return Promise.resolve();
   },
+  enableRuntimeEvents() {
+    return Promise.resolve();
+  },
+  evaluateScriptOnLoad() {
+    return Promise.resolve();
+  },
+  cleanAndDisableBrowserCaches() {},
+  clearDataForOrigin() {},
   beginTrace() {
     return Promise.resolve();
   },

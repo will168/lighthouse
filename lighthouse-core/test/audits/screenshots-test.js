@@ -21,20 +21,13 @@ const assert = require('assert');
 
 const pwaTrace = require('../fixtures/traces/progressive-app.json');
 
-let mockArtifacts = GatherRunner.instantiateComputedArtifacts();
+const mockArtifacts = GatherRunner.instantiateComputedArtifacts();
 mockArtifacts.traces = {
   defaultPass: {traceEvents: pwaTrace}
 };
 
 /* eslint-env mocha */
 describe('Performance: screenshots audit', () => {
-  it('fails gracefully', () => {
-    return Audit.audit({traces: {}}).then(output => {
-      assert.equal(output.score, -1);
-      assert.ok(output.debugString);
-    });
-  });
-
   // TODO: this is a bad test.
   it.skip('processes an empty trace for screenshot data', () => {
     return Audit.audit(mockArtifacts).then(output => {

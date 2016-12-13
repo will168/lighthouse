@@ -1,0 +1,170 @@
+<!--
+
+Copyright 2016 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+-->
+<!doctype html>
+
+<html data-report-context="{{reportContext}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <title>Lighthouse report: {{ url }}</title>
+  <style>{{{ css }}}</style>
+  <script>{{{ script }}}</script>
+</head>
+<body>
+
+<script>
+  // expose the original results
+  self.lhresults = {{{ lhresults }}};
+</script>
+
+<div class="js-report report">
+  <section class="report-body">
+    <div class="report-body__header">
+      <div class="report-body__metadata">
+        <div class="report-body__url">Results for: <a href="{{ url }}" target="_blank">{{ url }}</a></div>
+        <div class="report-body__url">Generated on: {{generatedTime}}</div>
+      </div>
+      <div class="report-body__buttons">
+        <button class="report-body__icon share js-share"></button>
+        <button class="report-body__icon copy js-copy"></button>
+        <button class="report-body__icon print js-print"></button>
+      </div>
+    </div>
+    <div class="report-body__content">
+      <div class="report-body__menu-container">
+        <div class="menu">
+          <div class="menu__header">
+            <h1 class="menu__header-title">Lighthouse</h1>
+            <div class="menu__header-version">Version: {{lighthouseVersion}}</div>
+          </div>
+          <ul class="menu__nav">
+            {{#each aggregations}}
+            <li class="menu__nav-item">
+              <a class="menu__link" href="#{{nameToLink this.name}}">
+                {{ this.name }}
+              </a>
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+      </div>
+
+      <div class="report-body__aggregations-container">
+      {{#each aggregations}}
+      <section class="js-breakdown aggregations" id="{{nameToLink this.name}}">
+        <header class="aggregations__header">
+          <h1>{{ this.name }}</h1>
+          <p class="aggregations__desc">{{ this.description }}</p>
+          {{#if this.scored}}
+          <div class="section-result">
+            <span class="section-result__score score-{{ getTotalScoreRating this }}-bg">
+              <span class="section-result__points">{{ getTotalScore this }}</span>
+              <span class="section-result__divider">/</span>
+              <span class="section-result__total">100</span>
+            </span>
+          </div>
+          {{/if}}
+        </header>
+
+        <div class="js-report-by-user-feature">
+          {{#each this.score as |aggregation|}}
+            <section class="aggregation">
+
+            {{#if aggregation.name }}
+            <header class="aggregation__header">
+              <h2>{{ aggregation.name }}</h2>
+              {{#if aggregation.description }}
+                <p class="aggregation__desc">{{{ aggregation.description }}}</p>
+              {{/if}}
+            </header>
+            {{/if}}
+
+            <ul class="subitems">
+              {{#each aggregation.subItems as |subItem| }}
+                <li class="subitem {{#if subItem.comingSoon}}--coming-soon{{/if}} {{#if (shouldShowHelpText subItem.score)}}--show-help{{/if}}">
+
+                  <p class="subitem__desc">
+                    {{#unless ../../scored }}
+                      <strong class="subitem__category">{{ subItem.category }}:</strong>
+                    {{/unless}}
+
+                    {{ subItem.description }}
+
+                    {{~#if (and subItem.displayValue (not (is-bool subItem.displayValue))) ~}}
+                      <strong class="subitem__raw-value">: {{ subItem.displayValue }}</strong>
+                    {{/if}}
+
+                    {{#if subItem.optimalValue }}
+                      <small>(target: {{ subItem.optimalValue }})</small>
+                    {{/if}}
+
+                    {{#if subItem.comingSoon}}
+                      <small class="subitem__tease">(Coming soon)</small>
+                    {{/if}}
+
+                    {{#if subItem.helpText }}
+                      <input type="checkbox" class="subitem__help-toggle" title="Toggle help text"  {{#if (shouldShowHelpText subItem.score)}}checked{{/if}}>
+                      <span class="subitem__help">
+                        {{{ subItem.helpText }}}
+                      </span>
+                    {{/if}}
+                  </p>
+
+                  {{#if subItem.debugString }}
+                    <div class="subitem__debug">
+                      {{{ subItem.debugString }}}
+                    </div>
+                  {{/if}}
+
+                  <div class="subitem-result">
+                    {{#if subItem.comingSoon}}
+                          <span class="subitem-result__unknown score-unknown-bg">N/A</span>
+                    {{else}}
+                      {{#if (is-bool subItem.score)}}
+                        {{#if subItem.score}}
+                          <span class="subitem-result__good score-good-bg">Pass</span>
+                        {{else}}
+                          <span class="subitem-result__poor score-poor-bg">Fail</span>
+                        {{/if}}
+                      {{else}}
+                        <span class="subitem-result__points score-{{ getItemRating subItem.score }}-bg">
+                          {{{ getItemValue subItem.score }}}
+                        </span>
+                      {{/if}}
+                    {{/if}}
+                  </div>
+
+                  {{#if subItem.extendedInfo.value}}
+                    {{> (lookup . 'name') subItem.extendedInfo.value }}
+                  {{/if}}
+                </li>
+              {{/each}}
+            </ul>
+          </section>
+          {{/each}}
+        </div>
+      </section>
+      {{/each}}
+      </div>
+    </div>
+
+    <footer class="footer">
+      Generated by <b>Lighthouse</b> on {{generatedTime}} | <a href="https://github.com/GoogleChrome/Lighthouse/issues" target="_blank">File an issue</a>
+    </footer>
+  </section>
+</div>

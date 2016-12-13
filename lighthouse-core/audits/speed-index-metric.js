@@ -34,9 +34,10 @@ class SpeedIndexMetric extends Audit {
     return {
       category: 'Performance',
       name: 'speed-index-metric',
-      description: 'Speed Index',
+      description: 'Perceptual Speed Index',
+      helpText: 'Speed Index shows how quickly the contents of a page are visibly populated. <a href="https://developers.google.com/web/tools/lighthouse/audits/speed-index" target="_blank" rel="noreferrer noopener">Learn more</a>.',
       optimalValue: SCORING_POINT_OF_DIMINISHING_RETURNS.toLocaleString(),
-      requiredArtifacts: ['traceContents']
+      requiredArtifacts: ['traces']
     };
   }
 
@@ -48,12 +49,6 @@ class SpeedIndexMetric extends Audit {
    */
   static audit(artifacts) {
     const trace = artifacts.traces[this.DEFAULT_PASS];
-    if (typeof trace === 'undefined') {
-      return SpeedIndexMetric.generateAuditResult({
-        rawValue: -1,
-        debugString: 'No trace found to generate screenshots'
-      });
-    }
 
     // run speedline
     return artifacts.requestSpeedline(trace).then(speedline => {
@@ -61,13 +56,6 @@ class SpeedIndexMetric extends Audit {
         return SpeedIndexMetric.generateAuditResult({
           rawValue: -1,
           debugString: 'Trace unable to find visual progress frames.'
-        });
-      }
-
-      if (speedline.frames.length < 3) {
-        return SpeedIndexMetric.generateAuditResult({
-          rawValue: -1,
-          debugString: 'Trace unable to find sufficient frames to evaluate Speed Index.'
         });
       }
 
@@ -86,7 +74,7 @@ class SpeedIndexMetric extends Audit {
       //  95th Percentile = 17,400
       const distribution = TracingProcessor.getLogNormalDistribution(SCORING_MEDIAN,
         SCORING_POINT_OF_DIMINISHING_RETURNS);
-      let score = 100 * distribution.computeComplementaryPercentile(speedline.speedIndex);
+      let score = 100 * distribution.computeComplementaryPercentile(speedline.perceptualSpeedIndex);
 
       // Clamp the score to 0 <= x <= 100.
       score = Math.min(100, score);
@@ -99,14 +87,14 @@ class SpeedIndexMetric extends Audit {
         frames: speedline.frames.map(frame => {
           return {
             timestamp: frame.getTimeStamp(),
-            progress: frame.getProgress()
+            progress: frame.getPerceptualProgress()
           };
         })
       };
 
       return SpeedIndexMetric.generateAuditResult({
         score: Math.round(score),
-        rawValue: Math.round(speedline.speedIndex),
+        rawValue: Math.round(speedline.perceptualSpeedIndex),
         optimalValue: this.meta.optimalValue,
         extendedInfo: {
           formatter: Formatter.SUPPORTED_FORMATS.SPEEDLINE,

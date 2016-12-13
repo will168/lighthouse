@@ -16,22 +16,23 @@
  */
 'use strict';
 
-/* Note that this returns the innerText of the <body> element, not the HTML. */
-
 const Gatherer = require('./gatherer');
 
-/* global document, __returnResults */
+/**
+ * @fileoverview Returns the innerText of the <body> element while JavaScript is
+ * disabled.
+ */
+
+/* global document */
 
 /* istanbul ignore next */
 function getBodyText() {
   // note: we use innerText, not textContent, because textContent includes the content of <script> elements!
   const body = document.querySelector('body');
-  // __returnResults is magically inserted by driver.evaluateAsync
-  __returnResults(body ? body.innerText : '');
+  return Promise.resolve(body ? body.innerText : '');
 }
 
 class HTMLWithoutJavaScript extends Gatherer {
-
   beforePass(options) {
     options.disableJavaScript = true;
   }
@@ -40,19 +41,22 @@ class HTMLWithoutJavaScript extends Gatherer {
     // Reset the JS disable.
     options.disableJavaScript = false;
 
-    const driver = options.driver;
+    return options.driver.evaluateAsync(`(${getBodyText.toString()}())`)
+      .then(result => {
+        if (typeof result !== 'string') {
+          throw new Error('result was not a string');
+        }
 
-    this.artifact = {};
-    return driver.evaluateAsync(`(${getBodyText.toString()}())`)
-    .then(result => {
-      this.artifact = result;
-    })
-    .catch(_ => {
-      this.artifact = {
-        value: -1,
-        debugString: 'Unable to get document body innerText'
-      };
-    });
+        this.artifact = {
+          value: result
+        };
+      })
+      .catch(err => {
+        this.artifact = {
+          value: -1,
+          debugString: `Unable to get document body innerText: ${err.message}`
+        };
+      });
   }
 }
 

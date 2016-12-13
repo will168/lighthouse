@@ -35,16 +35,15 @@ Object.keys(glMatrixModule).forEach(exportName => {
   global[exportName] = glMatrixModule[exportName];
 });
 // from catapult/tracing/tracing/extras/importer/jszip.html
-global.JSZip = require('jszip/dist/jszip.min.js');
+global.JSZip = {};
 global.mannwhitneyu = {};
-
 global.HTMLImportsLoader = {};
 global.HTMLImportsLoader.hrefToAbsolutePath = function(path) {
   if (path === '/gl-matrix-min.js') {
     return '../../../lib/empty-stub.js';
   }
   if (path === '/jszip.min.js') {
-    return 'jszip/dist/jszip.min.js';
+    return '../../../lib/empty-stub.js';
   }
   if (path === '/mannwhitneyu.js') {
     return '../../../lib/empty-stub.js';
@@ -110,7 +109,7 @@ class TraceProcessor {
    * within the window should be given as `clippedLength`. For instance, if a
    * 50ms duration occurs 10ms before the end of the window, `50` should be in
    * the `durations` array, and `clippedLength` should be set to 40.
-   * @see https://docs.google.com/document/d/18gvP-CBA2BiBpi3Rz1I1ISciKGhniTSZ9TY0XCnXS7E/preview
+   * @see https://docs.google.com/document/d/1b9slyaB9yho91YTOkAQfpCdULFkZM9LqsipcX3t7He8/preview
    * @param {!Array<number>} durations Array of durations, sorted in ascending order.
    * @param {number} totalTime Total time (in ms) of interval containing durations.
    * @param {!Array<number>} percentiles Array of percentiles of interest, in ascending order.
@@ -141,7 +140,7 @@ class TraceProcessor {
     }
 
     // Find percentiles of interest, in order.
-    for (let percentile of percentiles) {
+    for (const percentile of percentiles) {
       // Loop over durations, calculating a CDF value for each until it is above
       // the target percentile.
       const percentileTime = percentile * totalTime;
@@ -174,7 +173,7 @@ class TraceProcessor {
   /**
    * Calculates the maximum queueing time (in ms) of high priority tasks for
    * selected percentiles within a window of the main thread.
-   * @see https://docs.google.com/document/d/18gvP-CBA2BiBpi3Rz1I1ISciKGhniTSZ9TY0XCnXS7E/preview
+   * @see https://docs.google.com/document/d/1b9slyaB9yho91YTOkAQfpCdULFkZM9LqsipcX3t7He8/preview
    * @param {!traceviewer.Model} model
    * @param {{traceEvents: !Array<!Object>}} trace
    * @param {number=} startTime Optional start time (in ms) of range of interest. Defaults to trace start.
@@ -193,6 +192,21 @@ class TraceProcessor {
       percentiles = [0.5, 0.75, 0.9, 0.99, 1];
     }
 
+    const ret = TraceProcessor.getMainThreadTopLevelEventDurations(model, trace, startTime,
+        endTime);
+    return TraceProcessor._riskPercentiles(ret.durations, totalTime, percentiles,
+        ret.clippedLength);
+  }
+
+  /**
+   * Provides durations of all main thread top-level events
+   * @param {!traceviewer.Model} model
+   * @param {{traceEvents: !Array<!Object>}} trace
+   * @param {number} startTime Optional start time (in ms) of range of interest. Defaults to trace start.
+   * @param {number} endTime Optional end time (in ms) of range of interest. Defaults to trace end.
+   * @return {{durations: !Array<number>, clippedLength: number}}
+   */
+  static getMainThreadTopLevelEventDurations(model, trace, startTime, endTime) {
     // Find the main thread via the first TracingStartedInPage event in the trace
     const startEvent = trace.traceEvents.find(event => {
       return event.name === 'TracingStartedInPage';
@@ -227,8 +241,10 @@ class TraceProcessor {
     });
     durations.sort((a, b) => a - b);
 
-    // Actual calculation of percentiles done in _riskPercentiles.
-    return TraceProcessor._riskPercentiles(durations, totalTime, percentiles, clippedLength);
+    return {
+      durations,
+      clippedLength
+    };
   }
 
   /**

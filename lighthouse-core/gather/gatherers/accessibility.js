@@ -16,7 +16,7 @@
  */
 'use strict';
 
-/* global document, __returnResults */
+/* global document */
 
 const Gatherer = require('./gatherer');
 const fs = require('fs');
@@ -27,9 +27,8 @@ const axe = fs.readFileSync(
 // This is run in the page, not Lighthouse itself.
 /* istanbul ignore next */
 function runA11yChecks() {
-  axe.a11yCheck(document, function(results) {
-    // __returnResults is magically inserted by driver.evaluateAsync
-    __returnResults(results);
+  return new Promise((resolve, reject) => {
+    axe.a11yCheck(document, resolve);
   });
 }
 
@@ -44,9 +43,13 @@ class Accessibility extends Gatherer {
 
   afterPass(options) {
     const driver = options.driver;
+    const expression = `(function () {
+      ${axe};
+      return (${runA11yChecks.toString()}());
+    })()`;
 
     return driver
-        .evaluateAsync(`${axe};(${runA11yChecks.toString()}())`)
+        .evaluateAsync(expression)
         .then(returnedValue => {
           if (!returnedValue) {
             this.artifact = Accessibility._errorAccessibility('Unable to parse axe results');

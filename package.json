@@ -1,18 +1,18 @@
 {
   "name": "lighthouse",
-  "version": "1.1.4",
+  "version": "1.2.2",
   "description": "Lighthouse",
   "main": "./lighthouse-core/index.js",
   "bin": {
     "lighthouse": "./lighthouse-cli/index.js",
-    "chrome-debug": "lighthouse-core/scripts/launch-chrome.sh"
+    "chrome-debug": "./lighthouse-cli/manual-chrome-launcher.js"
   },
   "engines": {
     "node": ">=5"
   },
   "scripts": {
     "lint": "[ \"$CI\" = true ] && eslint --quiet . || eslint .",
-    "smoke": "lighthouse-cli/scripts/run-smoke-tests.sh",
+    "smoke": "lighthouse-cli/test/smokehouse/offline-local/run-tests.sh && lighthouse-cli/test/smokehouse/dobetterweb/run-tests.sh",
     "coverage": "node $__node_harmony $(npm bin)/istanbul cover -x \"**/third_party/**\" _mocha -- $(find */test -name '*-test.js') --timeout 10000 --reporter progress",
     "coveralls": "npm run coverage && cat ./coverage/lcov.info | coveralls",
     "start": "node ./lighthouse-cli/index.js",
@@ -22,16 +22,21 @@
     "closure": "cd lighthouse-core && closure/closure-type-checking.js",
     "watch": "lighthouse-core/scripts/run-mocha.sh --watch",
     "chrome": "lighthouse-core/scripts/launch-chrome.sh",
-    "dbw": "npm run start -- --config-path=lighthouse-core/config/dobetterweb.json --mobile=false --output=html --output-path=results.html"
+    "fast": "npm run start -- --disable-device-emulation --disable-cpu-throttling --disable-network-throttling",
+    "smokehouse": "node $__node_harmony lighthouse-cli/test/smokehouse/smokehouse.js",
+    "deploy-viewer": "cd lighthouse-viewer && gulp deploy"
   },
   "devDependencies": {
+    "@types/node": "^6.0.45",
+    "babel-core": "^6.16.0",
+    "babel-plugin-transform-es2015-destructuring": "^6.9.0",
     "coveralls": "^2.11.9",
-    "eslint-config-google": "^0.4.0",
     "eslint": "^2.4.0",
+    "eslint-config-google": "^0.4.0",
     "google-closure-compiler": "^20160517.0.0",
+    "gulp": "^3.9.1",
     "gulp-replace": "^0.5.4",
     "gulp-util": "^3.0.7",
-    "gulp": "^3.9.1",
     "istanbul": "^0.4.3",
     "jsdom": "^9.0.0",
     "mkdirp": "^0.5.1",
@@ -41,18 +46,17 @@
   },
   "dependencies": {
     "axe-core": "^1.1.1",
-    "chrome-devtools-frontend": "1.0.401423",
-    "chrome-remote-interface": "^0.11.0",
+    "chrome-devtools-frontend": "1.0.422034",
     "debug": "^2.2.0",
     "devtools-timeline-model": "1.1.6",
     "gl-matrix": "2.3.2",
     "handlebars": "^4.0.5",
     "json-stringify-safe": "^5.0.1",
-    "jszip": "2.6.0",
     "mkdirp": "^0.5.1",
     "rimraf": "^2.2.8",
     "semver": ">=4.3.3",
-    "speedline": "1.0.0",
+    "speedline": "1.0.3",
+    "ws": "^1.1.1",
     "yargs": "3.30.0"
   },
   "repository": "googlechrome/lighthouse",

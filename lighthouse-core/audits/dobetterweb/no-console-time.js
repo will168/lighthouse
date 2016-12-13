@@ -35,7 +35,7 @@ class NoConsoleTimeAudit extends Audit {
       category: 'JavaScript',
       name: 'no-console-time',
       description: 'Site does not use console.time() in its own scripts',
-      helpText: 'Consider using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/User_Timing_API" target="_blank">User Timine API</a> (<a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/mark" target="_blank">performance.mark()</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/measure" target="_blank">performance.measure()</a>), which is a standard, uses high resolution timestamps, and has the added benefit of integrating with the DevTools timeline.',
+      helpText: 'Consider using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/User_Timing_API" target="_blank">User Timing API</a> (<a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/mark" target="_blank">performance.mark()</a> and <a href="https://developer.mozilla.org/en-US/docs/Web/API/Performance/measure" target="_blank">performance.measure()</a>), which is a standard, uses high resolution timestamps, and has the added benefit of integrating with the DevTools timeline.',
       requiredArtifacts: ['URL', 'ConsoleTimeUsage']
     };
   }
@@ -45,21 +45,25 @@ class NoConsoleTimeAudit extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (typeof artifacts.ConsoleTimeUsage === 'undefined' ||
-        artifacts.ConsoleTimeUsage === -1) {
+    if (artifacts.ConsoleTimeUsage.value === -1) {
+      let debugString = 'Unknown error with the ConsoleTimeUsage gatherer';
+      if (artifacts.ConsoleTimeUsage.debugString) {
+        debugString = artifacts.ConsoleTimeUsage.debugString;
+      }
+
       return NoConsoleTimeAudit.generateAuditResult({
         rawValue: -1,
-        debugString: 'ConsoleTimeUsage gatherer did not run'
+        debugString
       });
     }
 
     const pageHost = url.parse(artifacts.URL.finalUrl).host;
-    // Filter usage from other hosts.
+    // Filter usage from other hosts and keep eval'd code.
     const results = artifacts.ConsoleTimeUsage.usage.filter(err => {
-      return url.parse(err.url).host === pageHost;
+      return err.isEval ? err.url : url.parse(err.url).host === pageHost;
     }).map(err => {
       return Object.assign({
-        misc: `(line: ${err.line}, col: ${err.col})`
+        label: `line: ${err.line}, col: ${err.col}`
       }, err);
     });
 

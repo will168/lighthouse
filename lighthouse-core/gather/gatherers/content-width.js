@@ -18,13 +18,13 @@
 
 const Gatherer = require('./gatherer');
 
-/* global window, __returnResults */
+/* global window */
 
 /* istanbul ignore next */
 function getContentWidth() {
   // window.innerWidth to get the scrollable size of the window (irrespective of zoom)
   // window.outerWidth to get the size of the visible area
-  __returnResults({
+  return Promise.resolve({
     scrollWidth: window.innerWidth,
     viewportWidth: window.outerWidth
   });
@@ -38,6 +38,11 @@ class ContentWidth extends Gatherer {
     return driver.evaluateAsync(`(${getContentWidth.toString()}())`)
 
     .then(returnedValue => {
+      if (!Number.isFinite(returnedValue.scrollWidth) ||
+          !Number.isFinite(returnedValue.viewportWidth)) {
+        throw new Error(`ContentWidth results were not numeric: ${JSON.stringify(returnedValue)}`);
+      }
+
       this.artifact = returnedValue;
     }, _ => {
       this.artifact = {

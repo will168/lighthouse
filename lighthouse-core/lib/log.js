@@ -19,23 +19,25 @@
 const debug = require('debug');
 const EventEmitter = require('events').EventEmitter;
 
-function setLevel(level) {
-  if (level === 'verbose') {
-    debug.enable('*');
-  } else if (level === 'error') {
-    debug.enable('*:error');
-  } else {
-    debug.enable('*, -*:verbose');
-  }
-}
+// process.browser is set when browserify'd via the `process` npm module
+const isBrowser = process.browser;
 
-const loggers = {};
-function _log(title, logargs) {
-  const args = [...logargs].slice(1);
-  if (!loggers[title]) {
-    loggers[title] = debug(title);
-  }
-  return loggers[title](...args);
+const colors = {
+  red: isBrowser ? 'crimson' : 1,
+  yellow: isBrowser ? 'gold' : 3,
+  cyan: isBrowser ? 'darkturquoise' : 6,
+  green: isBrowser ? 'forestgreen' : 2,
+  blue: isBrowser ? 'steelblue' : 4,
+  magenta: isBrowser ? 'palevioletred' : 5
+};
+
+// whitelist non-red/yellow colors for debug()
+if (isBrowser) {
+  const debugBrowser = require('debug/browser');
+  debugBrowser.colors = [colors.cyan, colors.green, colors.blue, colors.magenta];
+} else {
+  const debugNode = require('debug/node');
+  debugNode.colors = [colors.cyan, colors.green, colors.blue, colors.magenta];
 }
 
 class Emitter extends EventEmitter {
@@ -58,25 +60,80 @@ class Emitter extends EventEmitter {
   }
 }
 
-module.exports = {
-  setLevel,
-  events: new Emitter(),
-  log(title) {
-    this.events.issueStatus(title, arguments);
-    return _log(title, arguments);
-  },
+const loggersByTitle = {};
+const loggingBufferColumns = 25;
 
-  warn(title) {
-    this.events.issueWarning(arguments);
-    return _log(`${title}:warn`, arguments);
-  },
+class Log {
 
-  error(title) {
-    return _log(`${title}:error`, arguments);
-  },
-
-  verbose(title) {
-    this.events.issueStatus(title, arguments);
-    return _log(`${title}:verbose`, arguments);
+  static _logToStdErr(title, argsArray) {
+    const args = [...argsArray];
+    const log = Log.loggerfn(title);
+    log(...args);
   }
-};
+
+  static loggerfn(title) {
+    let log = loggersByTitle[title];
+    if (!log) {
+      log = debug(title);
+      loggersByTitle[title] = log;
+      // errors with red, warnings with yellow.
+      // eslint-disable-next-line no-nested-ternary
+      log.color = title.endsWith('error') ? colors.red :
+          title.endsWith('warn') ? colors.yellow : undefined;
+    }
+    return log;
+  }
+
+  static setLevel(level) {
+    switch (level) {
+      case 'silent':
+        debug.disable();
+        break;
+      case 'verbose':
+        debug.enable('*');
+        break;
+      case 'error':
+        debug.enable('*:error');
+        break;
+      default:
+        debug.enable('*, -*:verbose');
+    }
+  }
+
+  /**
+   * A simple formatting utility for event logging.
+   * @param {string} prefix
+   * @param {!Object} data A JSON-serializable object of event data to log.
+   * @param {string=} level Optional logging level. Defaults to 'log'.
+   */
+  static formatProtocol(prefix, data, level) {
+    const columns = (!process || process.browser) ? Infinity : process.stdout.columns;
+    const maxLength = columns - data.method.length - prefix.length - loggingBufferColumns;
+    // IO.read blacklisted here to avoid logging megabytes of trace data
+    const snippet = (data.params && data.method !== 'IO.read') ?
+      JSON.stringify(data.params).substr(0, maxLength) : '';
+    Log._logToStdErr(`${prefix}:${level || ''}`, [data.method, snippet]);
+  }
+
+  static log(title) {
+    Log.events.issueStatus(title, arguments);
+    return Log._logToStdErr(title, Array.from(arguments).slice(1));
+  }
+
+  static warn(title) {
+    Log.events.issueWarning(arguments);
+    return Log._logToStdErr(`${title}:warn`, Array.from(arguments).slice(1));
+  }
+
+  static error(title) {
+    return Log._logToStdErr(`${title}:error`, Array.from(arguments).slice(1));
+  }
+
+  static verbose(title) {
+    Log.events.issueStatus(title);
+    return Log._logToStdErr(`${title}:verbose`, Array.from(arguments).slice(1));
+  }
+}
+Log.events = new Emitter();
+
+module.exports = Log;

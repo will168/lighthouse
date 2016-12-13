@@ -16,58 +16,133 @@
  */
 'use strict';
 
-const ExtensionProtocol = require('../../../lighthouse-core/gather/drivers/extension');
+const ExtensionProtocol = require('../../../lighthouse-core/gather/connections/extension');
+const RawProtocol = require('../../../lighthouse-core/gather/connections/raw');
 const Runner = require('../../../lighthouse-core/runner');
 const Config = require('../../../lighthouse-core/config/config');
 const defaultConfig = require('../../../lighthouse-core/config/default.json');
 const log = require('../../../lighthouse-core/lib/log');
 
+const ReportGenerator = require('../../../lighthouse-core/report/report-generator');
+
 const STORAGE_KEY = 'lighthouse_audits';
 const _flatten = arr => [].concat.apply([], arr);
 
-window.createPageAndPopulate = function(results) {
-  const tabURL = chrome.extension.getURL('/pages/report.html');
-  chrome.tabs.create({url: tabURL}, tab => {
-    // Results will be lost when using sendMessage without waiting for the
-    // receiving side to load. Once it loads, we get a message -
-    // ready=true. Respond to this message with the results.
-    chrome.runtime.onMessage.addListener((message, sender, respond) => {
-      if (message && message.ready && sender.tab.id === tab.id) {
-        return respond(results);
-      }
+/**
+ * Filter out any unrequested aggregations from the config. If any audits are
+ * no longer needed by any remaining aggregations, filter out those as well.
+ * @param {!Object} config Lighthouse config object.
+ * @param {!Object<boolean>} requestedAggregations
+ */
+function filterConfig(config, requestedAggregations) {
+  config.aggregations = config.aggregations.filter(aggregation => {
+    // First filter out single `item` aggregations, which use top level name.
+    if (aggregation.items.length === 1) {
+      return requestedAggregations[aggregation.name];
+    }
+
+    // Next, filter the `items` array of aggregations with multiple sub-aggregations.
+    aggregation.items = aggregation.items.filter(item => {
+      return requestedAggregations[item.name];
     });
+
+    // Finally, filter out any aggregations with no sub-aggregations remaining.
+    return aggregation.items.length > 0;
   });
+
+  // Find audits required for remaining aggregations.
+  const requestedItems = _flatten(config.aggregations.map(aggregation => aggregation.items));
+  const auditsArray = _flatten(requestedItems.map(item => Object.keys(item.audits)));
+  const requestedAuditNames = new Set(auditsArray);
+
+  // The `audits` property in the config is a list of paths of audits to run.
+  // `requestedAuditNames` is a list of audit *names*. Map paths to names, then
+  // filter out any paths of audits with names that weren't requested.
+  const auditPathToName = new Map(Config.requireAudits(config.audits)
+    .map((AuditClass, index) => {
+      const auditPath = config.audits[index];
+      const auditName = AuditClass.meta.name;
+      return [auditPath, auditName];
+    }));
+  config.audits = config.audits.filter(auditPath => {
+    const auditName = auditPathToName.get(auditPath);
+    return requestedAuditNames.has(auditName);
+  });
+}
+
+/**
+ * @param {!Connection} connection
+ * @param {string} url
+ * @param {!Object} options Lighthouse options.
+ * @param {!Object<boolean>} requestedAggregations Names of aggregations to include.
+ * @return {!Promise}
+ */
+window.runLighthouseForConnection = function(connection, url, options, requestedAggregations) {
+  // Always start with a freshly parsed default config.
+  const runConfig = JSON.parse(JSON.stringify(defaultConfig));
+
+  filterConfig(runConfig, requestedAggregations);
+  const config = new Config(runConfig);
+
+  // Add url and config to fresh options object.
+  const runOptions = Object.assign({}, options, {url, config});
+
+  // Run Lighthouse.
+  return Runner.run(connection, runOptions);
 };
 
 /**
  * @param {!Object} options Lighthouse options.
- * @param {!Array<string>} requestedAudits Names of audits to run.
+ * @param {!Object<boolean>} requestedAggregations Names of aggregations to include.
  * @return {!Promise}
  */
-window.runLighthouse = function(options, requestedAudits) {
+window.runLighthouseInExtension = function(options, requestedAggregations) {
   // Default to 'info' logging level.
   log.setLevel('info');
-  const driver = new ExtensionProtocol();
-
-  return driver.getCurrentTabURL()
-    .then(url => {
-      // Always start with a freshly parsed default config.
-      const runConfig = JSON.parse(JSON.stringify(defaultConfig));
-
-      // Filter out audits not requested.
-      requestedAudits = new Set(requestedAudits);
-      runConfig.audits = runConfig.audits.filter(audit => requestedAudits.has(audit));
-      const config = new Config(runConfig);
-
-      // Add url and config to fresh options object.
-      const runOptions = Object.assign({}, options, {url, config});
-
-      // Run Lighthouse.
-      return Runner.run(driver, runOptions);
-    }).catch(e => {
-      console.error(e);
-      throw e;
+  const connection = new ExtensionProtocol();
+  return connection.getCurrentTabURL()
+    .then(url => window.runLighthouseForConnection(connection, url, options, requestedAggregations))
+    .then(results => {
+      const blobURL = window.createReportPageAsBlob(results, 'extension');
+      chrome.tabs.create({url: blobURL});
     });
+};
+
+/**
+ * @param {!RawProtocol.Port} port
+ * @param {string} url
+ * @param {!Object} options Lighthouse options.
+ * @param {!Object<boolean>} requestedAggregations Names of aggregations to include.
+ * @return {!Promise}
+ */
+window.runLighthouseInWorker = function(port, url, options, requestedAggregations) {
+  // Default to 'info' logging level.
+  log.setLevel('info');
+  const connection = new RawProtocol(port);
+  return window.runLighthouseForConnection(connection, url, options, requestedAggregations);
+};
+
+/**
+ * @param {!Object} results Lighthouse results object
+ * @param {!string} reportContext Where the report is going
+ * @return {!string} Blob URL of the report (or error page) HTML
+ */
+window.createReportPageAsBlob = function(results, reportContext) {
+  performance.mark('report-start');
+
+  const reportGenerator = new ReportGenerator();
+  let html;
+  try {
+    html = reportGenerator.generateHTML(results, reportContext);
+  } catch (err) {
+    html = reportGenerator.renderException(err, results);
+  }
+  const blob = new Blob([html], {type: 'text/html'});
+  const blobURL = window.URL.createObjectURL(blob);
+
+  performance.mark('report-end');
+  performance.measure('generate report', 'report-start', 'report-end');
+  return blobURL;
 };
 
 /**
@@ -81,7 +156,7 @@ window.getDefaultAggregations = function() {
       if (aggregation.items.length === 1) {
         return {
           name: aggregation.name,
-          criteria: aggregation.items[0].criteria,
+          audits: aggregation.items[0].audits,
         };
       }
 
@@ -90,7 +165,7 @@ window.getDefaultAggregations = function() {
   ).map(aggregation => {
     return {
       name: aggregation.name,
-      audits: Object.keys(aggregation.criteria)
+      audits: Object.keys(aggregation.audits)
     };
   });
 };
@@ -141,8 +216,10 @@ window.listenForStatus = function(callback) {
   log.events.addListener('status', callback);
 };
 
-chrome.runtime.onInstalled.addListener(details => {
-  if (details.previousVersion) {
-    console.log('previousVersion', details.previousVersion);
-  }
-});
+if (window.chrome && chrome.runtime) {
+  chrome.runtime.onInstalled.addListener(details => {
+    if (details.previousVersion) {
+      console.log('previousVersion', details.previousVersion);
+    }
+  });
+}

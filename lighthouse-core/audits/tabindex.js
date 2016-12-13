@@ -27,7 +27,7 @@ class TabIndex extends Audit {
   static get meta() {
     return {
       category: 'Accessibility',
-      name: 'tab-index',
+      name: 'tabindex',
       description: 'No element has a tabindex attribute greater than 0',
       requiredArtifacts: ['Accessibility']
     };
@@ -38,8 +38,8 @@ class TabIndex extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    const rule =
-        artifacts.Accessibility.violations.find(result => result.id === 'tabindex');
+    const violations = artifacts.Accessibility.violations || [];
+    const rule = violations.find(result => result.id === 'tabindex');
 
     return TabIndex.generateAuditResult({
       rawValue: typeof rule === 'undefined',

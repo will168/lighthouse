@@ -28,6 +28,7 @@ class ContentWidth extends Audit {
       category: 'Mobile Friendly',
       name: 'content-width',
       description: 'Content is sized correctly for the viewport',
+      helpText: 'If the width of your app\'s content doesn\'t match the width of the viewport, your app might not be optimized for mobile screens. <a href="https://developers.google.com/web/tools/lighthouse/audits/content-sized-correctly-for-viewport" rel="noreferrer noopener" target="_blank">Learn more</a>.',
       requiredArtifacts: ['ContentWidth']
     };
   }
@@ -37,17 +38,9 @@ class ContentWidth extends Audit {
    * @return {!AuditResult}
    */
   static audit(artifacts) {
-    if (typeof artifacts.ContentWidth === 'undefined' ||
-        typeof artifacts.ContentWidth.scrollWidth === 'undefined' ||
-        typeof artifacts.ContentWidth.viewportWidth === 'undefined') {
-      return ContentWidth.generateAuditResult({
-        rawValue: false,
-        debugString: 'Unable to find scroll and viewport widths.'
-      });
-    }
-
-    const widthsMatch =
-        artifacts.ContentWidth.scrollWidth === artifacts.ContentWidth.viewportWidth;
+    const scrollWidth = artifacts.ContentWidth.scrollWidth;
+    const viewportWidth = artifacts.ContentWidth.viewportWidth;
+    const widthsMatch = scrollWidth === viewportWidth && scrollWidth !== -1;
 
     return ContentWidth.generateAuditResult({
       rawValue: widthsMatch,
