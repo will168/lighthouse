@@ -56,7 +56,6 @@ function addMetrics(traceEvents, auditResults) {
   const resSI = res['speed-index-metric'];
   const resSIext = resSI.extendedInfo;
   const resTTI = res['time-to-interactive'];
-  const resTTIext = resTTI.extendedInfo;
 
   // monotonic clock ts from the trace.
   const navStart = resFMPext.value.timings.navStart;
@@ -85,10 +84,6 @@ function addMetrics(traceEvents, auditResults) {
     name: 'Time to Interactive',
     traceEvtName: 'MarkTTI',
     value: navStart + resTTI.rawValue,
-  }, {
-    name: 'Visually Complete 85%',
-    traceEvtName: 'MarkVC85',
-    value: resTTIext && (navStart + resTTIext.value.timings.visuallyReady),
   }, {
     name: 'Navigation Start',
     traceEvtName: 'MarkNavStart',
