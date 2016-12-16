@@ -19,7 +19,7 @@
 
 'use strict';
 
-const butterBar = require('../../../lighthouse-viewer/app/src/logger');
+const logger = require('./logger');
 
 class LighthouseReport {
 
@@ -61,7 +61,7 @@ class LighthouseReport {
       // We want to write our own data to the clipboard, not the user's text selection.
       e.preventDefault();
       e.clipboardData.setData('text/plain', JSON.stringify(this.json, null, 2));
-      butterBar.log('Report copied to clipboard');
+      logger.log('Report copied to clipboard');
     }
 
     this._copyAttempt = false;
@@ -82,12 +82,12 @@ class LighthouseReport {
         const successful = document.execCommand('copy');
         if (!successful) {
           this._copyAttempt = false; // Prevent event handler from seeing this as a copy attempt.
-          butterBar.warn('Your browser does not support copy to clipboard.');
+          logger.warn('Your browser does not support copy to clipboard.');
         }
       }
     } catch (err) {
       this._copyAttempt = false;
-      butterBar.log(err.message);
+      logger.log(err.message);
     }
   }
 }

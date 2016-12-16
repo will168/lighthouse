@@ -22,7 +22,7 @@
 const FileUploader = require('./fileuploader');
 const GithubAPI = require('./github');
 const idb = require('idb-keyval');
-const logger = require('./logger');
+const logger = require('../../../lighthouse-core/report/scripts/logger');
 const ReportGenerator = require('../../../lighthouse-core/report/report-generator');
 const LighthouseReport = require('../../../lighthouse-core/report/scripts/lighthouse-report');
 
