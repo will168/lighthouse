@@ -23,9 +23,6 @@ limitations under the License.
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <title>Lighthouse report: {{ url }}</title>
   <style>{{{ css }}}</style>
-  {{#if script }}
-    <script>{{{ script }}}</script>
-  {{/if}}
 </head>
 <body>
 
@@ -37,9 +34,9 @@ limitations under the License.
         <div class="report-body__url">Generated on: {{generatedTime}}</div>
       </div>
       <div class="report-body__buttons">
-        <button class="report-body__icon share js-share"></button>
-        <button class="report-body__icon copy js-copy"></button>
-        <button class="report-body__icon print js-print"></button>
+        <button class="report-body__icon share js-share" title="Share report on Github"></button>
+        <button class="report-body__icon copy js-copy" title="Copy JSON"></button>
+        <button class="report-body__icon print js-print" title="Print this report"></button>
       </div>
     </div>
     <div class="report-body__content">
@@ -165,3 +162,17 @@ limitations under the License.
     </footer>
   </section>
 </div>
+
+<div class="log-wrapper">
+  <div id="log"></div>
+</div>
+
+{{#if script }}
+<script>
+window.lhresults = {{{lhresults}}};
+
+{{{ script }}}
+</script>
+{{/if}}
+</body>
+</html>
