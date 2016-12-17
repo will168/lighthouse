@@ -51,6 +51,8 @@ class LighthouseViewerReport {
 
     this.initUI();
     this.loadFromURL();
+
+    this.listenForMessages();
   }
 
   initUI() {
@@ -68,9 +70,9 @@ class LighthouseViewerReport {
       // Disable the share button after the user shares the gist or if we're loading
       // a gist from Github. In both cases, the gist is already shared :)
       if (this._isNewReport) {
-        this.enableShareButton();
+        this.enableButton(this.shareButton);
       } else {
-        this.disableShareButton();
+        this.disableButton(this.shareButton);
       }
     }
 
@@ -81,16 +83,21 @@ class LighthouseViewerReport {
     }
 
     document.addEventListener('paste', this.onPaste);
+
+    // Disable "Open in Lighthouse Viewer" button. We're already in the viewer.
+    this.disableButton(document.querySelector('.js-open'));
   }
 
-  enableShareButton() {
-    this.shareButton.classList.remove('disable');
-    this.shareButton.disabled = false;
+  enableButton(button) {
+    if (button) {
+      button.disabled = false;
+    }
   }
 
-  disableShareButton() {
-    this.shareButton.classList.add('disable');
-    this.shareButton.disabled = true;
+  disableButton(button) {
+    if (button) {
+      button.disabled = true;
+    }
   }
 
   loadFromURL() {
@@ -199,7 +206,7 @@ class LighthouseViewerReport {
     return this.github.createGist(this.json).then(id => {
       ga('send', 'event', 'report', 'created');
 
-      this.disableShareButton();
+      this.disableButton(this.shareButton);
       history.pushState({}, null, `${APP_URL}?gist=${id}`);
 
       return id;
@@ -258,6 +265,23 @@ class LighthouseViewerReport {
       ga('send', 'event', 'report', 'paste');
     } catch (err) {
       // noop
+    }
+  }
+
+  /**
+   * Initializes of a `message` listener to respond to postMessage events.
+   */
+  listenForMessages() {
+    window.addEventListener('message', e => {
+      if (e.data.lhresults) {
+        this.replaceReportHTML(e.data.lhresults);
+        ga('send', 'event', 'report', 'open in viewer');
+      }
+    });
+
+    // If the page was opened as a popup, tell the opening window we're ready.
+    if (self.opener && !self.closed) {
+      self.opener.postMessage({opened: true}, '*');
     }
   }
 }
