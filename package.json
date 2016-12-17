@@ -11,14 +11,14 @@
     "node": ">=5"
   },
   "scripts": {
-    "postinstall": "cd lighthouse-core && npm install && npm run build",
+    "prepublish": "cd lighthouse-core && npm install && npm run build",
+    "build-core": "cd lighthouse-core && npm run build",
     "lint": "[ \"$CI\" = true ] && eslint --quiet -f codeframe . || eslint .",
     "smoke": "lighthouse-cli/test/smokehouse/offline-local/run-tests.sh && lighthouse-cli/test/smokehouse/dobetterweb/run-tests.sh",
     "coverage": "node $__node_harmony $(npm bin)/istanbul cover -x \"**/third_party/**\" _mocha -- $(find */test -name '*-test.js') --timeout 10000 --reporter progress",
     "coveralls": "npm run coverage && cat ./coverage/lcov.info | coveralls",
     "start": "node ./lighthouse-cli/index.js",
-    "test": "npm run lint --silent && npm run build-core && npm run unit",
-    "build-core": "cd lighthouse-core && npm run build",
+    "test": "npm run lint --silent && npm run unit",
     "cli-unit": "lighthouse-core/scripts/run-mocha.sh --cli",
     "unit": "lighthouse-core/scripts/run-mocha.sh --default",
     "closure": "cd lighthouse-core && closure/closure-type-checking.js",
