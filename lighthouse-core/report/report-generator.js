@@ -101,6 +101,15 @@ class ReportGenerator {
     // !value
     Handlebars.registerHelper('not', value => !value);
 
+    // value == value2?
+    Handlebars.registerHelper('if_not_eq', function(conditional, options) {
+      if (conditional !== options.hash.equals) {
+        return options.fn(this);
+      } else {
+        return options.inverse(this);
+      }
+    });
+
     // arg1 && arg2 && ... && argn
     Handlebars.registerHelper('and', function() {
       let arg = false;
