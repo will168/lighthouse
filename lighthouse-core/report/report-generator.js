@@ -104,9 +104,9 @@ class ReportGenerator {
     // value == value2?
     Handlebars.registerHelper('if_not_eq', function(conditional, options) {
       if (conditional !== options.hash.equals) {
-        return options.fn(this);
+        return options.fn();
       } else {
-        return options.inverse(this);
+        return options.inverse();
       }
     });
 
