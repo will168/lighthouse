@@ -104,9 +104,11 @@ class ReportGenerator {
     // value == value2?
     Handlebars.registerHelper('if_not_eq', function(lhs, rhs, options) {
       if (lhs !== rhs) {
-        return options.fn();
+        // eslint-disable-next-line no-invalid-this
+        return options.fn(this);
       } else {
-        return options.inverse();
+        // eslint-disable-next-line no-invalid-this
+        return options.inverse(this);
       }
     });
 
