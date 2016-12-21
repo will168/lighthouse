@@ -317,9 +317,12 @@ class LighthouseViewerReport {
         break;
       case 'save-html':
         const reportGenerator = new ReportGenerator();
-        const htmlStr = reportGenerator.generateHTML(this.json, 'cli');
-
-        this._saveFile(new Blob([htmlStr], {type: 'text/html'}));
+        try {
+          const htmlStr = reportGenerator.generateHTML(this.json, 'cli');
+          this._saveFile(new Blob([htmlStr], {type: 'text/html'}));
+        } catch (err) {
+          logger.error('Could not export as HTML.');
+        }
         break;
     }
 
