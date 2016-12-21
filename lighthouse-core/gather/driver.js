@@ -54,6 +54,9 @@ class Driver {
       'disabled-by-default-devtools.timeline.stack',
       // 'disabled-by-default-v8.cpu_profile',  // these would include JS stack samples, but
       // 'disabled-by-default-v8.cpu_profile.hires', // will take the trace from 5MB -> 100MB
+      'disabled-by-default-v8.runtime',
+      'disabled-by-default-v8.runtime_stats',
+      'disabled-by-default-v8.runtime_stats_sampling',
       'disabled-by-default-devtools.screenshot'
     ];
   }
